@@ -1,0 +1,30 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\Campaign;
+use App\Models\CampaignMail;
+use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use Illuminate\Database\Seeder;
+
+class CampaignMailSeeder extends Seeder
+{
+    /**
+     * Run the database seeds.
+     */
+    public function run(): void
+    {
+        Campaign::query()->with('emailList.subscribers')->get()
+            ->each(function(Campaign $campaign){
+                if (!$campaign->emailList) return;
+                
+                foreach($campaign->emailList->subscribers as $subscriber) {
+                    CampaignMail::factory()->create([
+                        'campaign_id' => $campaign->id,
+                        'subscriber_id' => $subscriber->id,
+                        'sent_at' => $campaign->sent_at,
+                    ]);
+                }
+            });
+    }
+}

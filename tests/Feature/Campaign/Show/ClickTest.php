@@ -1,0 +1,85 @@
+<?php
+use App\Models\Campaign;
+use App\Models\CampaignMail;
+use App\Models\EmailList;
+use App\Models\Subscriber;
+use App\Models\Template;
+use Illuminate\Support\Facades\DB;
+
+use function Pest\Laravel\get;
+
+beforeEach(function(){
+    login();
+    $emailList = EmailList::factory()->has(
+        Subscriber::factory()
+        ->count(3)
+        ->sequence(
+            ['name' => 'Joe Doe Test', 'email' => 'joe@doe.com'],
+            ['name' => 'Jane'],
+            ['name' => 'Charles'],
+        )
+    )->create();
+    $this->campaign = Campaign::factory()->for($emailList)->create(['sent_at' => now()->format('Y-m-d')]);
+
+    $this->mail1 = CampaignMail::query()->create(['clicks' => 0,'clicks' => 7,'campaign_id' => $this->campaign->id,'subscriber_id' => $emailList->subscribers[0]->id,'sent_at' => $this->campaign->sent_at]);
+    $this->mail2 = CampaignMail::query()->create(['clicks' => 23,'clicks' => 5,'campaign_id' => $this->campaign->id,'subscriber_id' => $emailList->subscribers[1]->id,'sent_at' => $this->campaign->sent_at]);
+    $this->mail3 = CampaignMail::query()->create(['clicks' => 54,'clicks' => 0,'campaign_id' => $this->campaign->id,'subscriber_id' => $emailList->subscribers[2]->id,'sent_at' => $this->campaign->sent_at]);
+});
+
+it('should list all campaign mails and show the click on each mail', function(){
+    get(route('campaigns.show', ['campaign' => $this->campaign, 'what' => 'clicked']))
+        ->assertViewHas('what', 'clicked')
+        ->assertViewHas('query', function($query){
+            expect($query)->toHaveCount(3);
+
+            return true;
+        })
+        ->assertSeeInOrder([
+            $this->mail1->subscriber->name, $this->mail1->subscriber->clicks, $this->mail1->subscriber->email,
+            $this->mail2->subscriber->name, $this->mail2->subscriber->clicks, $this->mail2->subscriber->email,
+            $this->mail3->subscriber->name, $this->mail3->subscriber->clicks, $this->mail3->subscriber->email,
+        ]);
+});
+
+it('should be possible to filter by name', function(){
+    //Isso aqui exibe as queries do teste
+    // DB::listen(function($q){
+    //     dump($q);
+    // });
+    get(route('campaigns.show', ['campaign' => $this->campaign, 'what' => 'clicked', 'search' => 'Test']))
+        ->assertViewHas('what', 'clicked')
+        ->assertViewHas('query', function($query){
+            expect($query)->toHaveCount(1);
+
+            return true;
+        })
+        ->assertSeeInOrder([
+            $this->mail1->subscriber->name, $this->mail1->subscriber->clicks, $this->mail1->subscriber->email, 
+        ]);
+});
+
+it('should be possible to filter by email', function(){
+    get(route('campaigns.show', ['campaign' => $this->campaign, 'what' => 'clicked', 'search' => 'joe@doe.com']))
+        ->assertViewHas('what', 'clicked')
+        ->assertViewHas('query', function($query){
+            expect($query)->toHaveCount(1);
+
+            return true;
+        })
+        ->assertSeeInOrder([
+            $this->mail1->subscriber->name, $this->mail1->subscriber->clicks, $this->mail1->subscriber->email, 
+        ]);
+});
+
+it('should be possible to filter by clicks', function(){
+    get(route('campaigns.show', ['campaign' => $this->campaign, 'what' => 'clicked', 'search' => 7]))
+        ->assertViewHas('what', 'clicked')
+        ->assertViewHas('query', function($query){
+            expect($query)->toHaveCount(1);
+
+            return true;
+        })
+        ->assertSeeInOrder([
+            $this->mail1->subscriber->name, $this->mail1->subscriber->clicks, $this->mail1->subscriber->email, 
+        ]);
+});
